@@ -2,6 +2,8 @@
 
 Standalone Fern repository for Nebrija Creators API documentation.
 
+Last deployment trigger: 2026-04-27.
+
 ## Structure
 
 ```text
