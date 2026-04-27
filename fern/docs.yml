@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://schema.buildwithfern.dev/docs-yml.json
+instances:
+  - url: nebrija-creators.docs.buildwithfern.com
+
+title: Nebrija Creators API
+default-language: curl
+
+navigation:
+  - section: Start
+    contents:
+      - page: Welcome
+        path: ./docs/pages/welcome.mdx
+      - page: Quickstart
+        path: ./docs/pages/quickstart.mdx
+      - page: Authentication
+        path: ./docs/pages/authentication.mdx
+  - section: Guides
+    contents:
+      - page: Production workflow
+        path: ./docs/pages/workflow.mdx
+      - page: API key operations
+        path: ./docs/pages/api-keys.mdx
+  - section: API Reference
+    contents:
+      - api: API Reference
+
+colors:
+  accent-primary:
+    light: "#0f766e"
+    dark: "#5eead4"
+  background:
+    light: "#ffffff"
+    dark: "#071114"
+  sidebar-background:
+    light: "#f8fafc"
+    dark: "#0b1618"
+  header-background:
+    light: "#ffffff"
+    dark: "#071114"

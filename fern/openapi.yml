@@ -1,0 +1,1994 @@
+openapi: 3.1.0
+info:
+  title: Nebrija Creators API
+  version: 1.0.0
+  description: |
+    Public tenant API for Nebrija Creators. Use it to create reusable creative objects,
+    upload assets, create and edit projects, develop briefs, launch generation jobs,
+    and retrieve pipeline status or final video results.
+servers:
+  - url: https://creators.nebrija.ai/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: Discovery
+    description: API discovery and authenticated tenant context.
+  - name: Objects
+    description: Reusable business resources such as avatars, products, properties, brands, and locations.
+  - name: Assets
+    description: Media assets linked to the tenant or to a reusable object.
+  - name: Projects
+    description: Video projects, scripts, formats, templates, and editing settings.
+  - name: Briefs
+    description: Brief development endpoints that generate a launch-ready project script.
+  - name: Pipeline
+    description: Generation jobs, status polling, and final render results.
+  - name: Catalogs
+    description: Tenant structures, templates, and voices available to projects.
+  - name: API Keys
+    description: Tenant API key management for admin web sessions.
+
+security:
+  - bearerAuth: []
+  - apiKeyHeader: []
+  - nebrijaApiKeyHeader: []
+  - sessionCookie: []
+
+paths:
+  /:
+    get:
+      tags: [Discovery]
+      summary: Discover API endpoints
+      operationId: discoverPublicApi
+      description: Returns the authenticated tenant, auth context, API version, and endpoint map.
+      responses:
+        '200':
+          description: API discovery payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /objects:
+    get:
+      tags: [Objects]
+      summary: List objects
+      operationId: listObjects
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ObjectKind'
+      responses:
+        '200':
+          description: Paginated object list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListObjectsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Objects]
+      summary: Create object
+      operationId: createObject
+      description: Requires a `write` API key or an authenticated session with write access.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateObjectRequest'
+      responses:
+        '201':
+          description: Object created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /objects/{objectId}:
+    parameters:
+      - $ref: '#/components/parameters/ObjectId'
+    get:
+      tags: [Objects]
+      summary: Get object
+      operationId: getObject
+      responses:
+        '200':
+          description: Object details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectResource'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Objects]
+      summary: Update object
+      operationId: updateObject
+      description: Requires `write` scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateObjectRequest'
+      responses:
+        '200':
+          description: Object updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Objects]
+      summary: Delete object
+      operationId: deleteObject
+      description: Requires `write` scope. Deletes the object and unlinks/deletes associated assets according to application rules.
+      responses:
+        '200':
+          description: Object deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /assets:
+    get:
+      tags: [Assets]
+      summary: List assets
+      operationId: listAssets
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: type
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AssetType'
+        - name: objectId
+          in: query
+          required: false
+          description: Filter by linked object/resource id. `resourceId` is accepted as an alias.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated asset list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListAssetsResponse'
+    post:
+      tags: [Assets]
+      summary: Create or upload asset
+      operationId: createAsset
+      description: |
+        Requires `write` scope. Send JSON when the asset already has a public URL, or multipart form data to upload one or more files.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssetRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadAssetRequest'
+      responses:
+        '201':
+          description: Asset created. Multipart uploads return an `assets` array.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Asset'
+                  - $ref: '#/components/schemas/UploadAssetsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /assets/{assetId}:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    get:
+      tags: [Assets]
+      summary: Get asset
+      operationId: getAsset
+      responses:
+        '200':
+          description: Asset details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Assets]
+      summary: Update asset
+      operationId: updateAsset
+      description: Requires `write` scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAssetRequest'
+      responses:
+        '200':
+          description: Asset updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Assets]
+      summary: Delete asset
+      operationId: deleteAsset
+      description: Requires `write` scope.
+      responses:
+        '200':
+          description: Asset deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List projects
+      operationId: listProjects
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated project list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListProjectsResponse'
+    post:
+      tags: [Projects]
+      summary: Create project
+      operationId: createProject
+      description: Requires `write` scope. Use this when you already have a script or want to create a draft project before developing a brief.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProject'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /projects/from-brief:
+    post:
+      tags: [Briefs]
+      summary: Create project from brief
+      operationId: createProjectFromBrief
+      description: Requires `write` scope. Creates a project, develops the brief into a script and creative assignments, and returns it launch-ready.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectFromBriefRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateProjectFromBriefMultipartRequest'
+      responses:
+        '201':
+          description: Project created and brief developed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BriefDevelopmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /projects/{projectId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      summary: Get project
+      operationId: getProject
+      responses:
+        '200':
+          description: Project details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProject'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Projects]
+      summary: Update project
+      operationId: updateProject
+      description: Requires `write` scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Project updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProject'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Projects]
+      summary: Delete project
+      operationId: deleteProject
+      description: Requires `write` scope.
+      responses:
+        '200':
+          description: Project deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/brief:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      tags: [Briefs]
+      summary: Develop project brief
+      operationId: developProjectBrief
+      description: Requires `write` scope. Updates an existing project with a generated script and creative assignments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DevelopBriefRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DevelopBriefMultipartRequest'
+          text/plain:
+            schema:
+              type: string
+              minLength: 10
+              maxLength: 4000
+      responses:
+        '200':
+          description: Brief developed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BriefDevelopmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/launch:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      tags: [Pipeline]
+      summary: Launch project generation
+      operationId: launchProject
+      description: Requires `write` scope. Enqueues a BullMQ generation job and returns URLs to monitor status and result.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LaunchProjectRequest'
+      responses:
+        '202':
+          description: Generation job queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaunchProjectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/status:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Pipeline]
+      summary: Get project status
+      operationId: getProjectStatus
+      responses:
+        '200':
+          description: Current pipeline status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectStatusResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/result:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Pipeline]
+      summary: Get project result
+      operationId: getProjectResult
+      description: Returns `200` when the output is complete and `202` while the render is still processing.
+      responses:
+        '200':
+          description: Completed project result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResultResponse'
+        '202':
+          description: Project exists but final output is not ready yet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResultResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /structures:
+    get:
+      tags: [Catalogs]
+      summary: List structures
+      operationId: listStructures
+      responses:
+        '200':
+          description: Tenant structures.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [structures]
+                properties:
+                  structures:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Structure'
+
+  /templates:
+    get:
+      tags: [Catalogs]
+      summary: List templates
+      operationId: listTemplates
+      responses:
+        '200':
+          description: Tenant templates.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [templates]
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Template'
+
+  /voices:
+    get:
+      tags: [Catalogs]
+      summary: List voices
+      operationId: listVoices
+      responses:
+        '200':
+          description: Tenant voices.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [voices]
+                properties:
+                  voices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Voice'
+
+  /api-keys:
+    get:
+      tags: [API Keys]
+      summary: List tenant API keys
+      operationId: listTenantApiKeys
+      description: Requires an authenticated tenant admin web session. API keys cannot list other API keys.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated API key list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTenantApiKeysResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [API Keys]
+      summary: Create tenant API key
+      operationId: createTenantApiKey
+      description: Requires an authenticated tenant admin web session. The plaintext `token` is returned once.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantApiKeyRequest'
+      responses:
+        '201':
+          description: API key created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTenantApiKeyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api-keys/{apiKeyId}:
+    parameters:
+      - $ref: '#/components/parameters/ApiKeyId'
+    get:
+      tags: [API Keys]
+      summary: Get tenant API key
+      operationId: getTenantApiKey
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: API key metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apiKey]
+                properties:
+                  apiKey:
+                    $ref: '#/components/schemas/TenantApiKey'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [API Keys]
+      summary: Update tenant API key
+      operationId: updateTenantApiKey
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantApiKeyRequest'
+      responses:
+        '200':
+          description: API key updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apiKey]
+                properties:
+                  apiKey:
+                    $ref: '#/components/schemas/TenantApiKey'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [API Keys]
+      summary: Revoke tenant API key
+      operationId: revokeTenantApiKey
+      description: Revokes the key while preserving audit metadata.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: API key revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "Tenant API key, for example `Authorization: Bearer nvf_live_...`."
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Tenant API key header alternative.
+    nebrijaApiKeyHeader:
+      type: apiKey
+      in: header
+      name: x-nebrija-api-key
+      description: Nebrija-specific tenant API key header alternative.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: Admin web session cookie. Secure deployments may use `__Secure-next-auth.session-token`.
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    ObjectId:
+      name: objectId
+      in: path
+      required: true
+      schema:
+        type: string
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema:
+        type: string
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    ApiKeyId:
+      name: apiKeyId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request payload or query parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Missing, invalid, revoked, or expired credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: Authenticated but missing the required role or API key scope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Resource not found inside the authenticated tenant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        issues:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    JsonObject:
+      type: object
+      additionalProperties: true
+
+    ObjectKind:
+      type: string
+      enum: [AVATAR, PRODUCT, PROPERTY, BRAND, LOCATION]
+
+    AssetType:
+      type: string
+      enum: [AVATAR_IMAGE, BROLL, LOGO, FONT, AUDIO]
+
+    ApiKeyScope:
+      type: string
+      enum: [read_only, write]
+
+    AspectRatio:
+      type: string
+      enum: ['9:16', '16:9', '1:1']
+
+    Resolution:
+      type: string
+      enum: [720p, 1080p]
+
+    Quality:
+      type: string
+      enum: [draft, standard, high]
+
+    VideoProvider:
+      type: string
+      enum: [auto, stock, veo]
+
+    AvatarProvider:
+      type: string
+      enum: [auto, hedra]
+
+    CaptionPreset:
+      type: string
+      enum: [dopamine-pop, hook-beast, clean-sales, cinematic-punch]
+
+    MediaFit:
+      type: string
+      enum: [contain, cover]
+
+    TransitionStyle:
+      type: string
+      enum: [none, crossfade, wipe, zoom, glitch, whip, fade-black]
+
+    ImageStylePreset:
+      type: string
+      enum: [natural-phone, candid-night, clean-commercial, editorial-polish, sunlit-lifestyle]
+
+    AvatarStartFrameMode:
+      type: string
+      enum: [direct_upload, light_edit, generate_from_refs]
+
+    AvatarShot:
+      type: string
+      enum: [close-up, medium-close-up, waist-up, wide, over-shoulder]
+
+    SceneType:
+      type: string
+      enum: [avatar, broll_stock, broll_ai, data_viz, title_card, transition]
+
+    ProjectStatus:
+      type: string
+      enum: [draft, parsing, generating_audio, generating_video, composing, rendering, completed, failed]
+
+    Tenant:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        planId:
+          type: string
+          nullable: true
+
+    AuthContext:
+      oneOf:
+        - type: object
+          required: [type, apiKeyId, keyPrefix, scope]
+          properties:
+            type:
+              type: string
+              enum: [api_key]
+            apiKeyId:
+              type: string
+            keyPrefix:
+              type: string
+            scope:
+              $ref: '#/components/schemas/ApiKeyScope'
+        - type: object
+          required: [type, userId, role]
+          properties:
+            type:
+              type: string
+              enum: [session]
+            userId:
+              type: string
+            role:
+              type: string
+
+    DiscoveryResponse:
+      type: object
+      required: [version, tenant, auth, endpoints]
+      properties:
+        version:
+          type: string
+          example: v1
+        tenant:
+          $ref: '#/components/schemas/Tenant'
+        auth:
+          $ref: '#/components/schemas/AuthContext'
+        endpoints:
+          type: object
+          additionalProperties:
+            type: string
+
+    AssetInput:
+      type: object
+      required: [type, name, url]
+      properties:
+        type:
+          $ref: '#/components/schemas/AssetType'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        url:
+          type: string
+          format: uri
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+
+    CreateObjectRequest:
+      type: object
+      required: [kind, name]
+      properties:
+        kind:
+          $ref: '#/components/schemas/ObjectKind'
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 240
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+        assets:
+          type: array
+          maxItems: 20
+          default: []
+          items:
+            $ref: '#/components/schemas/AssetInput'
+
+    UpdateObjectRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 240
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+
+    ObjectResourceSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: '#/components/schemas/ObjectKind'
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    ObjectResource:
+      allOf:
+        - $ref: '#/components/schemas/ObjectResourceSummary'
+        - type: object
+          properties:
+            tenantId:
+              type: string
+            createdById:
+              type: string
+              nullable: true
+            metadata:
+              $ref: '#/components/schemas/JsonObject'
+            assets:
+              type: array
+              items:
+                $ref: '#/components/schemas/Asset'
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+
+    ListObjectsResponse:
+      type: object
+      required: [objects, total, page, limit]
+      properties:
+        objects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectResource'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateAssetRequest:
+      allOf:
+        - $ref: '#/components/schemas/AssetInput'
+        - type: object
+          properties:
+            objectId:
+              type: string
+              description: Optional object/resource id to link this asset to.
+
+    UploadAssetRequest:
+      type: object
+      required: [file]
+      properties:
+        type:
+          $ref: '#/components/schemas/AssetType'
+        objectId:
+          type: string
+        resourceId:
+          type: string
+          description: Alias for `objectId`.
+        name:
+          type: string
+          maxLength: 120
+        metadata:
+          type: string
+          description: JSON object encoded as a string.
+        file:
+          type: array
+          items:
+            type: string
+            format: binary
+
+    UpdateAssetRequest:
+      type: object
+      minProperties: 1
+      properties:
+        objectId:
+          type: string
+          nullable: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+
+    Asset:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        createdById:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          nullable: true
+        type:
+          $ref: '#/components/schemas/AssetType'
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+        resource:
+          $ref: '#/components/schemas/ObjectResourceSummary'
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UploadAssetsResponse:
+      type: object
+      required: [assets]
+      properties:
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
+
+    ListAssetsResponse:
+      type: object
+      required: [assets, total, page, limit]
+      properties:
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CharacterVoice:
+      type: object
+      required: [character]
+      properties:
+        character:
+          type: string
+          minLength: 1
+          maxLength: 80
+        voiceRecordId:
+          type: string
+          nullable: true
+        description:
+          type: string
+          maxLength: 240
+          nullable: true
+        avatarResourceId:
+          type: string
+          nullable: true
+        participantAvatarResourceIds:
+          type: array
+          items:
+            type: string
+        locationResourceId:
+          type: string
+          nullable: true
+        avatarShot:
+          $ref: '#/components/schemas/AvatarShot'
+        performancePrompt:
+          type: string
+          maxLength: 240
+          nullable: true
+
+    EditorSettings:
+      type: object
+      properties:
+        videoProvider:
+          $ref: '#/components/schemas/VideoProvider'
+        avatarProvider:
+          $ref: '#/components/schemas/AvatarProvider'
+        generateCaptions:
+          type: boolean
+        captionPreset:
+          $ref: '#/components/schemas/CaptionPreset'
+        captionTextColor:
+          type: string
+          pattern: '^#?[0-9a-fA-F]{6}$'
+        captionHighlightColor:
+          type: string
+          pattern: '^#?[0-9a-fA-F]{6}$'
+        captionSize:
+          type: integer
+          minimum: 28
+          maximum: 110
+        mediaFit:
+          $ref: '#/components/schemas/MediaFit'
+        transitionsEnabled:
+          type: boolean
+        transitionStyle:
+          $ref: '#/components/schemas/TransitionStyle'
+        transitionStyles:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransitionStyle'
+        imageStylePreset:
+          $ref: '#/components/schemas/ImageStylePreset'
+        imageStyleNotes:
+          type: string
+          maxLength: 500
+          nullable: true
+        avatarStartFrameMode:
+          $ref: '#/components/schemas/AvatarStartFrameMode'
+        characterVoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/CharacterVoice'
+
+    ScriptWorkbenchSettings:
+      type: object
+      properties:
+        ideaBrief:
+          type: string
+          maxLength: 4000
+        creativeObjective:
+          type: string
+          maxLength: 240
+        callToAction:
+          type: string
+          maxLength: 240
+        targetDurationSeconds:
+          type: integer
+          minimum: 15
+          maximum: 180
+        selectedAvatarResourceIds:
+          type: array
+          items:
+            type: string
+        selectedObjectResourceIds:
+          type: array
+          items:
+            type: string
+        selectedBrollAssetIds:
+          type: array
+          items:
+            type: string
+        voiceoverAvatarId:
+          type: string
+          nullable: true
+
+    SceneDirective:
+      type: object
+      required: [order, type]
+      properties:
+        order:
+          type: integer
+          minimum: 0
+        type:
+          $ref: '#/components/schemas/SceneType'
+
+    MusicDirection:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        mood:
+          type: string
+          enum: [corporate, uplifting, energetic, cinematic, calm, dramatic]
+          nullable: true
+        genreStyle:
+          type: string
+          maxLength: 200
+          nullable: true
+        tempoFeel:
+          type: string
+          maxLength: 200
+          nullable: true
+        instrumentation:
+          type: string
+          maxLength: 240
+          nullable: true
+        musicalPrompt:
+          type: string
+          maxLength: 400
+          nullable: true
+        hookMoment:
+          type: string
+          maxLength: 200
+          nullable: true
+        hookEffect:
+          type: string
+          maxLength: 200
+          nullable: true
+        bodyFeel:
+          type: string
+          maxLength: 200
+          nullable: true
+        endingFeel:
+          type: string
+          maxLength: 200
+          nullable: true
+        rationale:
+          type: string
+          maxLength: 240
+          nullable: true
+
+    CreateProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 120
+        script:
+          type: string
+          minLength: 10
+          maxLength: 20000
+        structureId:
+          type: string
+        templateId:
+          type: string
+        voiceRecordId:
+          type: string
+        avatarAssetId:
+          type: string
+        aspectRatio:
+          $ref: '#/components/schemas/AspectRatio'
+          default: '9:16'
+        resolution:
+          $ref: '#/components/schemas/Resolution'
+          default: 720p
+        editor:
+          $ref: '#/components/schemas/EditorSettings'
+        scriptWorkbench:
+          $ref: '#/components/schemas/ScriptWorkbenchSettings'
+        aiSceneDirectives:
+          type: array
+          items:
+            $ref: '#/components/schemas/SceneDirective'
+        aiMusicDirection:
+          $ref: '#/components/schemas/MusicDirection'
+          nullable: true
+
+    UpdateProjectRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 120
+        script:
+          type: string
+          minLength: 10
+          maxLength: 20000
+        structureId:
+          type: string
+          nullable: true
+        templateId:
+          type: string
+          nullable: true
+        voiceRecordId:
+          type: string
+          nullable: true
+        avatarAssetId:
+          type: string
+          nullable: true
+        aspectRatio:
+          $ref: '#/components/schemas/AspectRatio'
+        resolution:
+          $ref: '#/components/schemas/Resolution'
+        editor:
+          $ref: '#/components/schemas/EditorSettings'
+        scriptWorkbench:
+          $ref: '#/components/schemas/ScriptWorkbenchSettings'
+        aiSceneDirectives:
+          type: array
+          items:
+            $ref: '#/components/schemas/SceneDirective'
+        aiMusicDirection:
+          $ref: '#/components/schemas/MusicDirection'
+          nullable: true
+
+    DevelopBriefRequest:
+      type: object
+      required: [brief]
+      properties:
+        brief:
+          type: string
+          minLength: 10
+          maxLength: 4000
+        creativeObjective:
+          type: string
+          minLength: 3
+          maxLength: 240
+        callToAction:
+          type: string
+          maxLength: 240
+        forceRegenerate:
+          type: boolean
+          default: false
+        targetDurationSeconds:
+          type: integer
+          minimum: 15
+          maximum: 180
+          default: 15
+        avatarResourceIds:
+          type: array
+          default: []
+          items:
+            type: string
+        objectResourceIds:
+          type: array
+          default: []
+          items:
+            type: string
+        brollAssetIds:
+          type: array
+          default: []
+          items:
+            type: string
+        imageStylePreset:
+          $ref: '#/components/schemas/ImageStylePreset'
+        imageStyleNotes:
+          type: string
+          maxLength: 500
+          nullable: true
+
+    DevelopBriefMultipartRequest:
+      type: object
+      properties:
+        brief:
+          type: string
+          minLength: 10
+          maxLength: 4000
+        file:
+          type: string
+          format: binary
+          description: Plain-text briefing file. `briefing` is also accepted.
+        briefing:
+          type: string
+          format: binary
+        creativeObjective:
+          type: string
+        callToAction:
+          type: string
+        forceRegenerate:
+          type: boolean
+        targetDurationSeconds:
+          type: integer
+        avatarResourceIds:
+          type: string
+          description: Comma-separated ids or repeated form field.
+        objectResourceIds:
+          type: string
+          description: Comma-separated ids or repeated form field.
+        brollAssetIds:
+          type: string
+          description: Comma-separated ids or repeated form field.
+        imageStylePreset:
+          $ref: '#/components/schemas/ImageStylePreset'
+        imageStyleNotes:
+          type: string
+
+    CreateProjectFromBriefRequest:
+      allOf:
+        - $ref: '#/components/schemas/DevelopBriefRequest'
+        - type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+              minLength: 3
+              maxLength: 120
+            structureId:
+              type: string
+            templateId:
+              type: string
+            voiceRecordId:
+              type: string
+            avatarAssetId:
+              type: string
+            aspectRatio:
+              $ref: '#/components/schemas/AspectRatio'
+              default: '9:16'
+            resolution:
+              $ref: '#/components/schemas/Resolution'
+              default: 720p
+            editor:
+              $ref: '#/components/schemas/EditorSettings'
+
+    CreateProjectFromBriefMultipartRequest:
+      allOf:
+        - $ref: '#/components/schemas/DevelopBriefMultipartRequest'
+        - type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+            structureId:
+              type: string
+            templateId:
+              type: string
+            voiceRecordId:
+              type: string
+            avatarAssetId:
+              type: string
+            aspectRatio:
+              $ref: '#/components/schemas/AspectRatio'
+            resolution:
+              $ref: '#/components/schemas/Resolution'
+            editor:
+              type: string
+              description: JSON-encoded editor settings.
+
+    LaunchProjectRequest:
+      type: object
+      properties:
+        quality:
+          $ref: '#/components/schemas/Quality'
+          default: standard
+        videoProvider:
+          $ref: '#/components/schemas/VideoProvider'
+          default: auto
+        avatarProvider:
+          $ref: '#/components/schemas/AvatarProvider'
+          default: auto
+        forceFreshGeneration:
+          type: boolean
+          default: false
+        generateCaptions:
+          type: boolean
+          default: true
+        captionPreset:
+          $ref: '#/components/schemas/CaptionPreset'
+        captionTextColor:
+          type: string
+          pattern: '^#?[0-9a-fA-F]{6}$'
+        captionHighlightColor:
+          type: string
+          pattern: '^#?[0-9a-fA-F]{6}$'
+        captionSize:
+          type: integer
+          minimum: 28
+          maximum: 110
+        mediaFit:
+          $ref: '#/components/schemas/MediaFit'
+        transitionsEnabled:
+          type: boolean
+        transitionStyle:
+          $ref: '#/components/schemas/TransitionStyle'
+        transitionStyles:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransitionStyle'
+        imageStylePreset:
+          $ref: '#/components/schemas/ImageStylePreset'
+        imageStyleNotes:
+          type: string
+          maxLength: 500
+          nullable: true
+        avatarStartFrameMode:
+          $ref: '#/components/schemas/AvatarStartFrameMode'
+        characterVoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/CharacterVoice'
+        branding:
+          type: object
+          properties:
+            logoUrl:
+              type: string
+              format: uri
+            primaryColor:
+              type: string
+              pattern: '^#?[0-9a-fA-F]{6}$'
+            watermarkText:
+              type: string
+              maxLength: 120
+
+    LaunchProjectResponse:
+      type: object
+      required: [projectId, renderId, jobId, status, estimatedTimeSeconds, statusUrl, resultUrl]
+      properties:
+        projectId:
+          type: string
+        renderId:
+          type: string
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued]
+        estimatedTimeSeconds:
+          type: integer
+        statusUrl:
+          type: string
+          format: uri
+        resultUrl:
+          type: string
+          format: uri
+
+    BriefDevelopmentResponse:
+      type: object
+      required: [project, script, launchReady]
+      properties:
+        project:
+          $ref: '#/components/schemas/PublicProject'
+        script:
+          type: string
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CharacterVoice'
+        aiSceneDirectives:
+          type: array
+          items:
+            $ref: '#/components/schemas/SceneDirective'
+        aiMusicDirection:
+          $ref: '#/components/schemas/MusicDirection'
+          nullable: true
+        selectedAvatarResourceIds:
+          type: array
+          items:
+            type: string
+        selectedObjectResourceIds:
+          type: array
+          items:
+            type: string
+        selectedBrollAssetIds:
+          type: array
+          items:
+            type: string
+        launchReady:
+          type: boolean
+          example: true
+
+    Scene:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        order:
+          type: integer
+        type:
+          $ref: '#/components/schemas/SceneType'
+        status:
+          type: string
+        narration:
+          type: string
+          nullable: true
+        prompt:
+          type: string
+          nullable: true
+        videoUrl:
+          type: string
+          format: uri
+          nullable: true
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+
+    Render:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        status:
+          type: string
+        progress:
+          type: integer
+        outputUrl:
+          type: string
+          format: uri
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PublicProject:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        createdById:
+          type: string
+          nullable: true
+        name:
+          type: string
+        script:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        outputUrl:
+          type: string
+          format: uri
+          nullable: true
+        previewUrl:
+          type: string
+          format: uri
+          nullable: true
+        durationSeconds:
+          type: number
+          nullable: true
+        structureId:
+          type: string
+          nullable: true
+        templateId:
+          type: string
+          nullable: true
+        voiceRecordId:
+          type: string
+          nullable: true
+        avatarAssetId:
+          type: string
+          nullable: true
+        aspectRatio:
+          $ref: '#/components/schemas/AspectRatio'
+        resolution:
+          $ref: '#/components/schemas/Resolution'
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+        scenes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Scene'
+        renders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Render'
+        structure:
+          $ref: '#/components/schemas/Structure'
+          nullable: true
+        template:
+          $ref: '#/components/schemas/Template'
+          nullable: true
+        voiceRecord:
+          $ref: '#/components/schemas/Voice'
+          nullable: true
+        avatarAsset:
+          $ref: '#/components/schemas/Asset'
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ListProjectsResponse:
+      type: object
+      required: [projects, total, page, limit]
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicProject'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ProjectStatusResponse:
+      type: object
+      required: [status, progress, currentPhase, scenes]
+      properties:
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        currentPhase:
+          type: string
+        previewUrl:
+          type: string
+          format: uri
+          nullable: true
+        outputUrl:
+          type: string
+          format: uri
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        scenes:
+          type: array
+          items:
+            type: object
+            required: [id, type, status]
+            properties:
+              id:
+                type: string
+              type:
+                $ref: '#/components/schemas/SceneType'
+              status:
+                type: string
+              videoUrl:
+                type: string
+                format: uri
+                nullable: true
+
+    ProjectResultResponse:
+      type: object
+      required: [projectId, status, project]
+      properties:
+        projectId:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        outputUrl:
+          type: string
+          format: uri
+          nullable: true
+        previewUrl:
+          type: string
+          format: uri
+          nullable: true
+        durationSeconds:
+          type: number
+          nullable: true
+        latestRender:
+          $ref: '#/components/schemas/Render'
+          nullable: true
+        project:
+          $ref: '#/components/schemas/PublicProject'
+
+    Structure:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+          nullable: true
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        config:
+          $ref: '#/components/schemas/JsonObject'
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+          nullable: true
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        config:
+          $ref: '#/components/schemas/JsonObject'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Voice:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+          nullable: true
+        resourceId:
+          type: string
+          nullable: true
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          nullable: true
+        voiceId:
+          type: string
+          nullable: true
+        isDefault:
+          type: boolean
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TenantApiKey:
+      type: object
+      required: [id, label, scope, keyPrefix, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        scope:
+          $ref: '#/components/schemas/ApiKeyScope'
+        keyPrefix:
+          type: string
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ListTenantApiKeysResponse:
+      type: object
+      required: [apiKeys, total, page, limit]
+      properties:
+        apiKeys:
+          type: array
+          items:
+            $ref: '#/components/schemas/TenantApiKey'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateTenantApiKeyRequest:
+      type: object
+      required: [label]
+      properties:
+        label:
+          type: string
+          minLength: 2
+          maxLength: 80
+        scope:
+          $ref: '#/components/schemas/ApiKeyScope'
+          default: read_only
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateTenantApiKeyResponse:
+      type: object
+      required: [apiKey, token]
+      properties:
+        apiKey:
+          $ref: '#/components/schemas/TenantApiKey'
+        token:
+          type: string
+          description: Plaintext secret. Returned once and never stored in plaintext.
+          example: nvf_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+    UpdateTenantApiKeyRequest:
+      type: object
+      minProperties: 1
+      properties:
+        label:
+          type: string
+          minLength: 2
+          maxLength: 80
+        scope:
+          $ref: '#/components/schemas/ApiKeyScope'
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true

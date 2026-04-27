@@ -1,0 +1,54 @@
+# API key operations
+
+Los tenants pueden crear API keys desde el frontend y, para usuarios admin autenticados, desde la propia API.
+
+## Crear key
+
+```bash
+curl -X POST "$NEBRIJA_API_BASE/api-keys" \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "label": "Zapier production",
+    "scope": "write",
+    "expiresAt": null
+  }'
+```
+
+La respuesta devuelve:
+
+- `apiKey`: metadatos persistentes de la key.
+- `token`: secreto en texto plano, visible solo en esta respuesta.
+
+## Listar keys
+
+```bash
+curl "$NEBRIJA_API_BASE/api-keys?page=1&limit=20" -b cookies.txt
+```
+
+La lista nunca devuelve el token completo. Solo incluye `keyPrefix`, scope, fechas, ultimo uso y estado de revocacion.
+
+## Cambiar label, scope o expiracion
+
+```bash
+curl -X PATCH "$NEBRIJA_API_BASE/api-keys/api_key_id_here" \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "label": "Make production",
+    "scope": "read_only",
+    "expiresAt": "2026-12-31T23:59:59.000Z"
+  }'
+```
+
+## Revocar key
+
+```bash
+curl -X DELETE "$NEBRIJA_API_BASE/api-keys/api_key_id_here" -b cookies.txt
+```
+
+La revocacion es logica: la key conserva auditoria, pero deja de autenticar inmediatamente.
+
+## Decision de seguridad
+
+Estos endpoints requieren sesion admin y no aceptan autenticacion mediante API key. Es una restriccion deliberada: permite automatizar la gestion desde el panel o desde herramientas internas con sesion, sin permitir que una key comprometida cree nuevas keys.

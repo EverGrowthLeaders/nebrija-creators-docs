@@ -1,0 +1,78 @@
+# Production workflow
+
+Este es el flujo que deberia usar un agente de IA que trabaja con Nebrija Creators.
+
+## 1. Sincroniza catalogos
+
+Antes de crear proyectos, consulta los catalogos disponibles:
+
+```bash
+curl "$NEBRIJA_API_BASE/structures" -H "Authorization: Bearer $NEBRIJA_API_KEY"
+curl "$NEBRIJA_API_BASE/templates" -H "Authorization: Bearer $NEBRIJA_API_KEY"
+curl "$NEBRIJA_API_BASE/voices" -H "Authorization: Bearer $NEBRIJA_API_KEY"
+```
+
+Usa estas respuestas para elegir estructura narrativa, template, voz y recursos de tenant sin hardcodear IDs.
+
+## 2. Crea objetos de dominio
+
+Crea objetos para todo lo que deba poder reutilizarse:
+
+- `AVATAR`: personas, UGC creators, representantes de marca.
+- `PRODUCT`: productos fisicos o digitales.
+- `PROPERTY`: inmuebles o espacios inmobiliarios.
+- `BRAND`: marcas, submarcas, identidad comercial.
+- `LOCATION`: ciudades, locales, venues o escenarios.
+
+Adjunta metadata libre para que los agentes puedan razonar mejor sobre el recurso.
+
+## 3. Sube o registra assets
+
+Si ya tienes una URL publica, usa JSON en `POST /assets`. Si necesitas subir ficheros, usa `multipart/form-data` con uno o varios campos `file`.
+
+```bash
+curl -X POST "$NEBRIJA_API_BASE/assets" \
+  -H "Authorization: Bearer $NEBRIJA_API_KEY" \
+  -F "type=BROLL" \
+  -F "objectId=object_id_here" \
+  -F "name=Entrada del inmueble" \
+  -F "file=@entrada.mp4"
+```
+
+## 4. Genera o edita proyecto
+
+Hay dos caminos:
+
+- `POST /projects`: crea un proyecto con guion ya preparado o como borrador.
+- `POST /projects/from-brief`: crea el proyecto y desarrolla el briefing en una sola llamada.
+
+Para briefings recibidos como fichero, usa `multipart/form-data` con `file` o `briefing`.
+
+## 5. Desarrolla briefing hasta launch-ready
+
+Si el proyecto ya existe, llama a `POST /projects/{id}/brief`. Esta ruta actualiza el guion, asignaciones de avatares, directivas de escena, musica y recursos seleccionados.
+
+La respuesta incluye `launchReady: true` cuando el proyecto queda preparado para pipeline.
+
+## 6. Lanza pipeline
+
+`POST /projects/{id}/launch` reserva uso, crea un render, invalida renders activos anteriores del mismo proyecto y encola el job de generacion. La respuesta incluye:
+
+- `projectId`
+- `renderId`
+- `jobId`
+- `statusUrl`
+- `resultUrl`
+- `estimatedTimeSeconds`
+
+## 7. Consulta con una abstraccion comun
+
+No hagas polling ad hoc en cada integracion. Usa una utilidad comun que llame a `statusUrl` con backoff y corte por timeout. Cuando `status` sea `completed`, consulta `resultUrl` y consume `outputUrl`.
+
+Estados de proyecto:
+
+```text
+draft -> parsing -> generating_audio -> generating_video -> composing -> rendering -> completed
+```
+
+En error, el estado pasa a `failed` y `error` contiene la causa normalizada.

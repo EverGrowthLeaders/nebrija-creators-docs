@@ -1,0 +1,7 @@
+api:
+  specs:
+    - openapi: ./openapi.yml
+      settings:
+        title-as-schema-name: true
+        inline-path-parameters: true
+        respect-nullable-schemas: true

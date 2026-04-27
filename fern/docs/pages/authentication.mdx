@@ -1,0 +1,55 @@
+# Authentication
+
+Nebrija Creators acepta dos modos de autenticacion para `/api/v1`:
+
+- API key de tenant para integraciones externas y agentes.
+- Sesion web activa para usuarios autenticados dentro de la aplicacion.
+
+## API keys de tenant
+
+El modo recomendado para integraciones es enviar una API key en el header `Authorization`:
+
+```http
+Authorization: Bearer nvf_live_...
+```
+
+Tambien se aceptan estos headers cuando sea mas comodo para herramientas sin soporte Bearer:
+
+```http
+x-api-key: nvf_live_...
+x-nebrija-api-key: nvf_live_...
+```
+
+Las keys empiezan por `nvf_live_`. El token completo se devuelve una sola vez al crear la key. En base de datos solo se guarda un hash con pepper de servidor y un prefijo visible para identificacion.
+
+## Alcances
+
+| Scope | Puede hacer |
+| --- | --- |
+| `read_only` | Leer discovery, objetos, assets, proyectos, catalogos, estado y resultados. |
+| `write` | Todo lo anterior, mas crear, editar, borrar, desarrollar briefings y lanzar generaciones. |
+
+Si una key `read_only` intenta una mutacion, la API responde `403 Forbidden`.
+
+## Gestion de API keys
+
+Los endpoints `/api/v1/api-keys` requieren sesion web de un usuario con rol admin del tenant. Una API key no puede crear, rotar ni revocar otras API keys.
+
+Esto evita escaladas de privilegio: una key filtrada no puede emitir nuevas credenciales persistentes.
+
+## Errores habituales
+
+| Estado | Causa tipica |
+| --- | --- |
+| `401` | Falta el token, el token no existe, esta revocado o ha expirado. |
+| `403` | Scope insuficiente o usuario sin rol requerido. |
+| `400` | El body no cumple el esquema zod de la ruta. |
+| `404` | El recurso no existe dentro del tenant autenticado. |
+
+## Practicas recomendadas
+
+- Crea una key por integracion o agente, no una key compartida para todo.
+- Usa `read_only` para reporting, sincronizadores y dashboards.
+- Usa `write` solo para agentes capaces de mutar proyectos o lanzar pipeline.
+- Define `expiresAt` para integraciones temporales.
+- Revoca inmediatamente cualquier key que salga de tu secret manager.

@@ -1,0 +1,44 @@
+# Nebrija Creators API
+
+Nebrija Creators expone una API publica para que un agente, una integracion interna o un tenant externo pueda crear recursos creativos, preparar proyectos de video, desarrollar briefings y lanzar el pipeline de generacion sin entrar en la interfaz web.
+
+La API esta pensada para cinco flujos principales:
+
+- Catalogar objetos reutilizables: avatares, productos, inmuebles, marcas y ubicaciones.
+- Subir assets y asociarlos a esos objetos: imagenes de avatar, B-roll, logotipos, fuentes y audio.
+- Crear y editar proyectos con guion, template, estructura, voz, formato y ajustes visuales.
+- Convertir un briefing en un proyecto listo para lanzar.
+- Lanzar un job de generacion y consultar estado o resultado final.
+
+Base path:
+
+```text
+/api/v1
+```
+
+Autenticacion soportada:
+
+```http
+Authorization: Bearer nvf_live_...
+```
+
+Tambien se aceptan los headers `x-api-key` y `x-nebrija-api-key`. Las API keys de tenant pueden ser `read_only` o `write`. Las operaciones de lectura aceptan ambos alcances; las mutaciones y lanzamientos requieren `write`.
+
+## Endpoints principales
+
+| Area | Endpoints |
+| --- | --- |
+| Discovery | `GET /api/v1` |
+| Objetos | `GET /objects`, `POST /objects`, `GET/PATCH/DELETE /objects/{id}` |
+| Assets | `GET /assets`, `POST /assets`, `GET/PATCH/DELETE /assets/{id}` |
+| Proyectos | `GET /projects`, `POST /projects`, `GET/PATCH/DELETE /projects/{id}` |
+| Briefing | `POST /projects/from-brief`, `POST /projects/{id}/brief` |
+| Pipeline | `POST /projects/{id}/launch`, `GET /projects/{id}/status`, `GET /projects/{id}/result` |
+| Catalogos | `GET /structures`, `GET /templates`, `GET /voices` |
+| API keys | `GET/POST /api-keys`, `GET/PATCH/DELETE /api-keys/{id}` |
+
+## Modelo operativo
+
+Las llamadas siempre quedan limitadas al tenant autenticado. Una API key nunca ve ni modifica datos de otro tenant. Las API keys se almacenan hasheadas y el token completo solo se devuelve una vez al crearlas.
+
+Para automatizaciones, lo normal es crear una key `write` por integracion, guardarla en un secret manager y usar una key `read_only` separada para dashboards, auditorias o sincronizadores que no deban mutar datos.

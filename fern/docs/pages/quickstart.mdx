@@ -1,0 +1,106 @@
+# Quickstart
+
+Este flujo crea un objeto de negocio, genera un proyecto desde briefing, lanza el pipeline y consulta el resultado.
+
+## 1. Crea una API key
+
+Desde Nebrija Creators, entra en `Account > API Keys` y crea una key con alcance `write`. Copia el token cuando aparezca; no se volvera a mostrar.
+
+Exporta el token:
+
+```bash
+export NEBRIJA_API_KEY="nvf_live_REPLACE_ME"
+export NEBRIJA_API_BASE="https://creators.nebrija.ai/api/v1"
+```
+
+Si estas en local:
+
+```bash
+export NEBRIJA_API_BASE="http://localhost:3000/api/v1"
+```
+
+## 2. Comprueba acceso
+
+```bash
+curl "$NEBRIJA_API_BASE" \
+  -H "Authorization: Bearer $NEBRIJA_API_KEY"
+```
+
+La respuesta incluye el tenant, el contexto de autenticacion y el mapa de endpoints disponibles.
+
+## 3. Crea un objeto reutilizable
+
+```bash
+curl -X POST "$NEBRIJA_API_BASE/objects" \
+  -H "Authorization: Bearer $NEBRIJA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "PROPERTY",
+    "name": "Atico Castellana",
+    "description": "Inmueble premium para campana de captacion",
+    "metadata": {
+      "city": "Madrid",
+      "priceRange": "premium"
+    },
+    "assets": [
+      {
+        "type": "BROLL",
+        "name": "Salon principal",
+        "url": "https://example.com/salon.mp4"
+      }
+    ]
+  }'
+```
+
+Guarda el `id` del objeto para usarlo en el briefing.
+
+## 4. Genera un proyecto desde briefing
+
+```bash
+curl -X POST "$NEBRIJA_API_BASE/projects/from-brief" \
+  -H "Authorization: Bearer $NEBRIJA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Atico Castellana - Lead magnet",
+    "brief": "Crear un video vertical de 30 segundos para captar compradores internacionales. Tono premium, directo y aspiracional.",
+    "creativeObjective": "Generar solicitudes de visita cualificadas",
+    "callToAction": "Agenda una visita privada",
+    "targetDurationSeconds": 30,
+    "objectResourceIds": ["object_id_here"],
+    "aspectRatio": "9:16",
+    "resolution": "1080p"
+  }'
+```
+
+La respuesta devuelve `project`, `script`, asignaciones creativas y `launchReady: true`.
+
+## 5. Lanza el pipeline
+
+```bash
+curl -X POST "$NEBRIJA_API_BASE/projects/project_id_here/launch" \
+  -H "Authorization: Bearer $NEBRIJA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "quality": "standard",
+    "videoProvider": "auto",
+    "avatarProvider": "auto",
+    "generateCaptions": true,
+    "captionPreset": "clean-sales"
+  }'
+```
+
+La API devuelve `statusUrl` y `resultUrl`. El pipeline corre por cola y puede tardar varios minutos segun duracion, proveedores y concurrencia.
+
+## 6. Consulta estado y resultado
+
+```bash
+curl "$NEBRIJA_API_BASE/projects/project_id_here/status" \
+  -H "Authorization: Bearer $NEBRIJA_API_KEY"
+```
+
+```bash
+curl "$NEBRIJA_API_BASE/projects/project_id_here/result" \
+  -H "Authorization: Bearer $NEBRIJA_API_KEY"
+```
+
+Mientras el render no este completo, `GET /result` puede responder `202`. Cuando el proyecto este `completed`, la respuesta incluye `outputUrl`, `previewUrl`, duracion y el ultimo render.
